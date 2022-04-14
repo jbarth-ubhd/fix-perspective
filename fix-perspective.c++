@@ -248,6 +248,12 @@ void findBest_lrtb(const Mat col_sums, const Mat row_sums, float &best_a, float 
 
 int main(int argc, char **argv) {
 	mutime_init();
+	if(argc-1!=2) {
+		printf("Fixes perspective of text images\n");
+		printf("usage: %s input_image output_image\n", argv[0]);
+		printf("e. g.  %s input.tif output.tif\n", argv[0]);
+		return 1;
+	}
 
     Mat im   =imread(argv[1], IMREAD_REDUCED_GRAYSCALE_2);
     if(im.data==NULL) return 255;
