@@ -2,7 +2,7 @@
 
 > Tool to correct perspective distortion
 
-* Does correct verticals 
+* Does align horizontal + vertical
 * Uses opencv4 and eigen3
 
 ## Installation
