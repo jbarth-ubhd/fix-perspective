@@ -31,6 +31,7 @@
 	9. Transformation durchführen.
 
 	Annahmen:
+		Für beste Ergebnisse: ge'crop'te Scans
 		Halbwegs registerhaltiger Satz
 
 	TODO: Auf Text-Struktur prüfen (etwa gleich große weiße und schwarze Bereiche)
