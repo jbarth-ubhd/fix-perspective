@@ -1,6 +1,6 @@
 # fix-perspective
 
-> Tool to correct perspective distortion
+> Tool to compensate perspective distortion in document images
 
 * Does align horizontal + vertical
 * Needs `opencv4` and `eigen3`
@@ -29,7 +29,7 @@ Reads the input image file under the first argument, writes its output image fil
 
 Example:
 
-    /fix-perspective input_image.tif output_image.png
+    fix-perspective input_image.tif output_image.png
 
 ## Limits
 
