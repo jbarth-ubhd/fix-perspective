@@ -258,9 +258,8 @@ int main(int argc, char **argv) {
     Mat im   =imread(argv[1], IMREAD_REDUCED_GRAYSCALE_2);
 
     if(im.data==NULL) return 255;
-    im=255-im; // or absdiff?
+    im=255-im; // TODO maxval
 	if(debug) STOP(0);
-    Mat blurM;
 
 	/* opencv-4.x/modules/imgproc/src/smooth.dispatch.cpp
     // automatic detection of kernel size from sigma
@@ -268,26 +267,66 @@ int main(int argc, char **argv) {
         ksize.width = cvRound(sigma1*(depth == CV_8U ? 3 : 4)*2 + 1)|1; */
     int maxDim=std::max(im.cols, im.rows);
 	float sigma=maxDim/MIN_TEXT_LINES;
-	int ksize=sigma*2*2; if(! (ksize%2)) ksize++;
-    // GaussianBlur(im, blurM, Size(ksize, ksize), sigma); // ist viel langsamer
-	blur(im, blurM, Size(ksize, ksize));
-
-    Mat wim=im-blurM;
+	int tmp_ksize=sigma*2*2; if(! (tmp_ksize%2)) tmp_ksize++;
+	Size ksize=Size(tmp_ksize, tmp_ksize);
+    // GaussianBlur(im, blurM, ksize, sigma); // ist viel langsamer
 
     Mat un   =imread(argv[1], IMREAD_UNCHANGED); // TODO: does not handle exif orientation
-	if(un.channels()>3) { // alpha channel present
-		Mat alpha;
-		assert(im.cols==un.cols/2 && im.rows==un.rows/2);
+	Mat blurM;
+	Mat wim;
+	if(un.channels()==2 || un.channels()>3) { // alpha channel present
+		// TODO channels==2
+		assert(un.channels()!=2);
+
+		// "blur" blurs all channels separately,
+		// but we need the transparent pixels be ignored.
+		assert(im.cols==un.cols/2 && im.rows==un.rows/2); // exif orientation
+
+		resize(un, un, im.size());
+
 		Mat rgba[un.channels()];
 		split(un, rgba);
-		alpha=rgba[3];
-		resize(rgba[3], alpha, im.size());
-		blur(alpha, alpha, Size(int(sigma+.5), int(sigma+.5)));
-		threshold(alpha, alpha, 128, 1e38, THRESH_TOZERO);
-	
-		if(debug) imwrite("alpha.png", alpha);
-		// multiply(wim, alpha, wim, 1./255);
+		vector<Mat> channels = {rgba[0],rgba[1],rgba[2]};
+		Mat rgb;
+		merge(channels, rgb);
+		Mat gray;
+		cvtColor(rgb, blurM, COLOR_RGB2GRAY);
+
+		Mat alpha=rgba[3];
+		Mat alpha_blur;
+
+		int erosion_size=15;
+		Mat element = getStructuringElement( MORPH_ELLIPSE,
+                       Size( 2*erosion_size + 1, 2*erosion_size+1 ),
+                       Point( erosion_size, erosion_size ) );
+		erode(alpha, alpha, element);
+		blur(alpha, alpha_blur, ksize);
+
+		blurM=255-blurM; // TODO maxval?
+		Mat out;
+		multiply(blurM, alpha, out, 1, CV_16U); // inplace does not work?
+		blurM=out;
+
+		blur(blurM, blurM, ksize);
+
+		divide(blurM, alpha_blur, out, 1, CV_8U); // inplace?
+		blurM=out;
+
+		imwrite("blurM.tif", blurM);
+
+		wim=im-blurM; // or absdiff?
+
+		/* threshold(alpha_blur, alpha_blur, 127.5, 1e38, THRESH_TOZERO);
+		imwrite("alpha_blur.tif", alpha_blur); */
+		// when using alpha_blur for dimming edges,
+		// there is the risk of not dimming edges near image border.
+		multiply(wim, /* alpha_blur or */ alpha, wim, 1./255);
 	}
+	else { // channels <= 3
+		blur(im, blurM, ksize);
+		wim=im-blurM; // or absdiff?
+	}
+
 	if(debug) imwrite("work.tif", wim);	
 
     int angle_steps=std::ceil(angle_range/angle_step)*2+1;
@@ -307,6 +346,10 @@ int main(int argc, char **argv) {
         hconcat(row_sums, row_sum, row_sums);
     }
 	if(debug) STOP(0);
+
+	Mat col_blur;
+	blur(col_sums, col_blur, Size(im.cols/10, 1));
+	absdiff(col_sums, col_blur, col_sums);
 
 	float sd_max, sd_median;
 
