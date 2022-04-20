@@ -43,7 +43,7 @@
 const float min_better=1.2f;
 const float angle_range=7.0;
 const float angle_step =0.1;
-float px_skip_percent  =1.0;
+float skip_lr_percent  =1.0;
 
 using namespace std;
 using namespace cv;
@@ -150,7 +150,7 @@ void adapt_angles(float &a0, float &a1, const float w, const float h) {
 }
 
 float sqr(const float x) { return x*x; }
-float calcSd(const Mat im, const int dim, float a0, float a1, int px_skip=0) {
+float calcSd(const Mat im, const int dim, float a0, float a1, int skip_lr=0) {
 	// "l" like "length"
 	// dim: see reduce: 0=to single row, 1=to single column
     const int l_max=dim==DIM_COL ? im.size().width-1 : im.size().height-1;
@@ -161,17 +161,17 @@ float calcSd(const Mat im, const int dim, float a0, float a1, int px_skip=0) {
     float float_a=a0 +.5; // +.5 wg. int()
 	int n=0;
 	if(dim==DIM_COL) {
-		// px_skip when col_sums only, because this alignment is much
+		// skip_lr when col_sums only, because this alignment is much
 		// more sensitive to joint (german: Falz) and edges of pages
 		// below
-	    for(int l=0+px_skip; l<=l_max-px_skip; l++) {
+	    for(int l=0+skip_lr; l<=l_max-skip_lr; l++) {
 			val[l]=im.at<uchar>(int(float_a), l           );
 			mean+=val[l];
 	        float_a+=delta_a;
 			n++;
 		}
 	} else { // DIM_ROW
-		assert(px_skip==0);
+		assert(skip_lr==0);
 	    for(int l=0; l<=l_max; l++) {
 			val[l]=im.at<uchar>(l           , int(float_a));
 			mean+=val[l];
@@ -182,7 +182,7 @@ float calcSd(const Mat im, const int dim, float a0, float a1, int px_skip=0) {
 	mean/=n;
 
 	float sd=0;
-    for(int l=px_skip; l<=l_max-px_skip; l++) {
+    for(int l=skip_lr; l<=l_max-skip_lr; l++) {
         sd+=sqr(val[l] - mean);
 	}
 	sd/=n-1;
@@ -199,7 +199,7 @@ int compar(const void *va, const void *vb) {
 	return 0;
 }
 
-void findBest(const Mat im, const int dim, bool sync, float &best_a0, float &best_a1, float &sd_max, float &sd_median, int px_skip=0) {
+void findBest(const Mat im, const int dim, bool sync, float &best_a0, float &best_a1, float &sd_max, float &sd_median, int skip_lr=0) {
 	if(debug) printf("--> dim=%d %s\n", dim, sync?"sync=true":"");
 	if(debug && !sync) STOP(1);
 	// "a" like "angle"
@@ -216,7 +216,7 @@ void findBest(const Mat im, const int dim, bool sync, float &best_a0, float &bes
 		float a1_start=sync ? a0 : 0    ;
 		float a1_stop =sync ? a0 : a_max;
         for(int a1=a1_start; a1<=a1_stop; a1++) {
-            const float sd=calcSd(im, dim, a0, a1, px_skip);
+            const float sd=calcSd(im, dim, a0, a1, skip_lr);
 			sd_array[n_elem++]=sd;
             if(sd<=sd_max) continue;
             sd_max=sd;
@@ -232,7 +232,7 @@ void findBest(const Mat im, const int dim, bool sync, float &best_a0, float &bes
 	if(debug && !sync) STOP(1);
 }
 
-void findBest_lrtb(const Mat col_sums, const Mat row_sums, float &best_a, float &sd_max, float &sd_median, int px_skip=0) {
+void findBest_lrtb(const Mat col_sums, const Mat row_sums, float &best_a, float &sd_max, float &sd_median, int skip_lr=0) {
 	// "a" like "angle"
 	// dim: see reduce: 0=to single row, 1=to single column
     sd_max=0.0;
@@ -241,7 +241,7 @@ void findBest_lrtb(const Mat col_sums, const Mat row_sums, float &best_a, float 
 	float sd_array[a_max+1];
 
     for(int a=0; a<=a_max; a++) {
-        const float sd_col=calcSd(col_sums, DIM_COL, a, a, px_skip);
+        const float sd_col=calcSd(col_sums, DIM_COL, a, a, skip_lr);
         const float sd_row=calcSd(row_sums, DIM_ROW, a, a);
 		const float sd=(sd_col+sd_row)/2.; // not comparable to findBest()
 		sd_array[a]=sd;
@@ -312,25 +312,25 @@ int main(int argc, char **argv) {
 #define A_DEG(x) (((x)-angle_off)*angle_factor)
 
 	// next line: height/2 because IMREAD_REDUCED_..._2
-	int px_skip_lr = px_skip_percent/100.f * im.size().height/2 +.5f;
-	if(debug) printf("skip l/r: 2× %d px\n", px_skip_lr);
+	int skip_lr = skip_lr_percent/100.f * im.size().height/2 +.5f;
+	if(debug) printf("skip l/r: 2× %d px\n", skip_lr);
 
     float a_test1, a_test2, a_dummy;
-    findBest_lrtb(col_sums, row_sums, a_test1, sd_max, sd_median, px_skip_lr);
+    findBest_lrtb(col_sums, row_sums, a_test1, sd_max, sd_median, skip_lr);
 	if(debug) printf("lrtb  =%+6.3f deg %f %f\n", A_DEG(a_test1), sd_max, sd_median);
 	if(sd_max >= sd_median*min_better) {
 		a_top=a_lef=a_rig=a_bot=A_DEG(a_test1);
 		printf("%7.3f %7.3f l=%+6.3f r=%+6.3f t=%+6.3f b=%+6.3f\n", sd_max, sd_median, a_lef, a_rig, a_top, a_bot);
 	}
 
-    findBest(col_sums, DIM_COL, SYNC, a_test1, a_dummy, sd_max, sd_median, px_skip_lr);
+    findBest(col_sums, DIM_COL, SYNC, a_test1, a_dummy, sd_max, sd_median, skip_lr);
     if(debug) printf("lr    =%+6.3f deg %f %f\n", A_DEG(a_test1), sd_max, sd_median);
 	if(sd_max >= sd_median*min_better) {
 		a_lef=a_rig=A_DEG(a_test1);
 		printf("%7.3f %7.3f l=%+6.3f r=%+6.3f t=%+6.3f b=%+6.3f\n", sd_max, sd_median, a_lef, a_rig, a_top, a_bot);
 	}
 
-    findBest(col_sums, DIM_COL, INDEPENDENT, a_test1, a_test2, sd_max, sd_median, px_skip_lr);
+    findBest(col_sums, DIM_COL, INDEPENDENT, a_test1, a_test2, sd_max, sd_median, skip_lr);
     if(debug) printf("left  =%+6.3f right =%+6.3f deg %f %f\n", A_DEG(a_test1), A_DEG(a_test2), sd_max, sd_median);
 	if(sd_max >= sd_median*min_better) {
 		a_lef=A_DEG(a_test1); a_rig=A_DEG(a_test2);
