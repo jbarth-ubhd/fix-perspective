@@ -35,9 +35,9 @@
 		Halbwegs registerhaltiger Satz
 
 	TODO: Auf Text-Struktur prüfen (etwa gleich große weiße und schwarze Bereiche)
-	TODO: berücksichtigt opencv Dateiinternes rotate-flag?
 	TODO: min_better für 5a schwächer, für 5c+5e härter?
-*/	
+	TODO: exif orientation ← IMREAD_UNCHANGED
+*/
 
 #define MIN_TEXT_LINES 30.f
 const float min_better=1.2f;
@@ -263,13 +263,24 @@ int main(int argc, char **argv) {
 		printf("e. g.  %s input.tif output.tif\n", argv[0]);
 		return 1;
 	}
-
     Mat im   =imread(argv[1], IMREAD_REDUCED_GRAYSCALE_2);
+    Mat un   =imread(argv[1], IMREAD_UNCHANGED /* TODO: does not handle exif orientation */);
+	Mat alpha;
+	if(un.channels()>3) { // alpha channel present
+		// TODO: rotate
+		assert(im.cols==un.cols/2 && im.rows==un.rows/2);
+		Mat rgba[un.channels()];
+		split(un, rgba);
+		alpha=rgba[3];
+		resize(rgba[3], alpha, im.size());
+		alpha/=255; // alpha.maxval or ...?
+	}
+		
     if(im.data==NULL) return 255;
-    im=255-im;
+    im=255-im; // or absdiff?
 	if(debug) STOP(0);
     Mat blurM;
-    int maxDim=std::max(im.size().width, im.size().height);
+    int maxDim=std::max(im.cols, im.rows);
 
 	/* opencv-4.x/modules/imgproc/src/smooth.dispatch.cpp
     // automatic detection of kernel size from sigma
@@ -281,6 +292,9 @@ int main(int argc, char **argv) {
 	blur(im, blurM, Size(ksize, ksize));
 
     Mat wim=im-blurM;
+	if(un.channels()>3) {
+		multiply(wim, alpha, wim);
+	}
 	if(debug) imwrite("work.tif", wim);	
 
     int angle_steps=std::ceil(angle_range/angle_step)*2+1;
