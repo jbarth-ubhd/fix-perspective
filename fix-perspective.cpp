@@ -172,6 +172,7 @@ float score(const Mat im, const int dim, float a0, float a1) {
 		}
 	}
 	mean/=l_max+1;
+	if(dim==DIM_COL) return mean;
 
 	float sd=0;
     for(int l=0; l<=l_max; l++) {
@@ -294,7 +295,7 @@ int main(int argc, char **argv) {
 		Mat alpha=rgba[3];
 		Mat alpha_blur;
 
-		int erosion_size=15;
+		int erosion_size=15; // TODO adjustable
 		Mat element = getStructuringElement( MORPH_ELLIPSE,
                        Size( 2*erosion_size + 1, 2*erosion_size+1 ),
                        Point( erosion_size, erosion_size ) );
@@ -312,12 +313,12 @@ int main(int argc, char **argv) {
 		divide(backgr, alpha_blur, out, 1, CV_8U); // inplace?
 		backgr=out;
 
-		imwrite("backgr.tif", backgr);
+		if(debug) imwrite("backgr.tif", backgr);
 
 		wim=im-backgr; // or absdiff?
 
 		/* threshold(alpha_blur, alpha_blur, 127.5, 1e38, THRESH_TOZERO);
-		imwrite("alpha_blur.tif", alpha_blur); */
+		if(debug) imwrite("alpha_blur.tif", alpha_blur); */
 		// when using alpha_blur for dimming edges,
 		// there is the risk of not dimming edges near image border.
 		multiply(wim, /* alpha_blur or */ alpha, wim, 1./255);
