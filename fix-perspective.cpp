@@ -149,10 +149,10 @@ void adapt_angles(float &a0, float &a1, const float w, const float h) {
 }
 
 float sqr(const float x) { return x*x; }
-float calcSd(const Mat im, const int dim, float a0, float a1) {
+float score(const Mat im, const int dim, float a0, float a1) {
 	// "l" like "length"
 	// dim: see reduce: 0=to single row, 1=to single column
-    const int l_max=dim==DIM_COL ? im.size().width-1 : im.size().height-1;
+    const int l_max=dim==DIM_COL ? im.cols-1 : im.rows-1;
     const float delta_a=(a1-a0)/l_max;
 
 	float val[l_max+1];
@@ -198,7 +198,7 @@ void findBest(const Mat im, const int dim, bool sync, float &best_a0, float &bes
 	// dim: see reduce: 0=to single row, 1=to single column
     sd_max=0.0;
 	// try all angle combinations
-    int a_max=dim==DIM_COL ? im.size().height-1 : im.size().width-1;
+    int a_max=dim==DIM_COL ? im.rows-1 : im.cols-1;
 
 	long max_elem=(a_max+1) * (sync ? 1 : a_max+1);
 	float sd_array[max_elem];
@@ -208,7 +208,7 @@ void findBest(const Mat im, const int dim, bool sync, float &best_a0, float &bes
 		float a1_start=sync ? a0 : 0    ;
 		float a1_stop =sync ? a0 : a_max;
         for(int a1=a1_start; a1<=a1_stop; a1++) {
-            const float sd=calcSd(im, dim, a0, a1);
+            const float sd=score(im, dim, a0, a1);
 			sd_array[n_elem++]=sd;
             if(sd<=sd_max) continue;
             sd_max=sd;
@@ -229,12 +229,12 @@ void findBest_lrtb(const Mat col_sums, const Mat row_sums, float &best_a, float 
 	// dim: see reduce: 0=to single row, 1=to single column
     sd_max=0.0;
 	// try all angle combinations
-    int a_max=row_sums.size().width-1;
+    int a_max=row_sums.cols-1;
 	float sd_array[a_max+1];
 
     for(int a=0; a<=a_max; a++) {
-        const float sd_col=calcSd(col_sums, DIM_COL, a, a);
-        const float sd_row=calcSd(row_sums, DIM_ROW, a, a);
+        const float sd_col=score(col_sums, DIM_COL, a, a);
+        const float sd_row=score(row_sums, DIM_ROW, a, a);
 		const float sd=(sd_col+sd_row)/2.; // not comparable to findBest()
 		sd_array[a]=sd;
         if(sd<=sd_max) continue;
@@ -333,10 +333,10 @@ int main(int argc, char **argv) {
     int angle_off=(angle_steps-1)/2;
     float angle_factor=angle_range/angle_off;
     
-    Mat row_sums=Mat(Size(0, im.size().height), CV_8UC1);
-    Mat col_sums=Mat(Size(im.size().width , 0), CV_8UC1);
+    Mat row_sums=Mat(Size(0, im.rows), CV_8UC1);
+    Mat col_sums=Mat(Size(im.cols , 0), CV_8UC1);
     for(int a=0; a<angle_steps; a++) {
-        Mat rotM=getRotationMatrix2D(Point2f(im.size().width/2., im.size().height/2.), (a-angle_off)*angle_factor, 1.0);
+        Mat rotM=getRotationMatrix2D(Point2f(im.cols/2., im.rows/2.), (a-angle_off)*angle_factor, 1.0);
         Mat rot;
         warpAffine(wim, rot, rotM, wim.size(), INTER_NEAREST);
     	Mat col_sum, row_sum;
@@ -405,8 +405,8 @@ int main(int argc, char **argv) {
 
 	// gemessen wurde am Rand, aber durch Verschiebung der "Winkelgeraden" nach innen
 	// muss der Winkel angepasst werden.
-	adapt_angles(a_lef, a_rig, im.size().width -1, im.size().height-1);
-	adapt_angles(a_top, a_bot, im.size().height-1, im.size().width -1);
+	adapt_angles(a_lef, a_rig, im.cols -1, im.rows-1);
+	adapt_angles(a_top, a_bot, im.rows-1, im.cols -1);
 
 	if(debug) {
 		double minVal, maxVal;
@@ -419,8 +419,8 @@ int main(int argc, char **argv) {
 	}
 
     Mat rgbIm=imread(argv[1]);
-    int hm1=rgbIm.size().height-1;
-    int wm1=rgbIm.size().width -1;
+    int hm1=rgbIm.rows-1;
+    int wm1=rgbIm.cols -1;
 
     float d_top=tan(-a_top*M_PI/180)*wm1;
     float d_bot=tan(-a_bot*M_PI/180)*wm1;
