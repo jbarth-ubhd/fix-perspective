@@ -269,17 +269,17 @@ int main(int argc, char **argv) {
 	float sigma=maxDim/MIN_TEXT_LINES;
 	int tmp_ksize=sigma*2*2; if(! (tmp_ksize%2)) tmp_ksize++;
 	Size ksize=Size(tmp_ksize, tmp_ksize);
-    // GaussianBlur(im, blurM, ksize, sigma); // ist viel langsamer
+    // GaussianBlur(im, backgr, ksize, sigma); // ist viel langsamer
 
     Mat un   =imread(argv[1], IMREAD_UNCHANGED); // TODO: does not handle exif orientation
-	Mat blurM;
+	Mat backgr;
 	Mat wim;
 	if(un.channels()==2 || un.channels()>3) { // alpha channel present
 		// TODO channels==2
 		assert(un.channels()!=2);
 
 		// "blur" blurs all channels separately,
-		// but we need the transparent pixels be ignored.
+		// without skiping transparent pixels
 		assert(im.cols==un.cols/2 && im.rows==un.rows/2); // exif orientation
 
 		resize(un, un, im.size());
@@ -289,8 +289,7 @@ int main(int argc, char **argv) {
 		vector<Mat> channels = {rgba[0],rgba[1],rgba[2]};
 		Mat rgb;
 		merge(channels, rgb);
-		Mat gray;
-		cvtColor(rgb, blurM, COLOR_RGB2GRAY);
+		cvtColor(rgb, backgr, COLOR_RGB2GRAY);
 
 		Mat alpha=rgba[3];
 		Mat alpha_blur;
@@ -300,21 +299,22 @@ int main(int argc, char **argv) {
                        Size( 2*erosion_size + 1, 2*erosion_size+1 ),
                        Point( erosion_size, erosion_size ) );
 		erode(alpha, alpha, element);
+
 		blur(alpha, alpha_blur, ksize);
 
-		blurM=255-blurM; // TODO maxval?
+		backgr=255-backgr; // TODO maxval?
 		Mat out;
-		multiply(blurM, alpha, out, 1, CV_16U); // inplace does not work?
-		blurM=out;
+		multiply(backgr, alpha, out, 1, CV_16U); // inplace does not work?
+		backgr=out;
 
-		blur(blurM, blurM, ksize);
+		blur(backgr, backgr, ksize);
 
-		divide(blurM, alpha_blur, out, 1, CV_8U); // inplace?
-		blurM=out;
+		divide(backgr, alpha_blur, out, 1, CV_8U); // inplace?
+		backgr=out;
 
-		imwrite("blurM.tif", blurM);
+		imwrite("backgr.tif", backgr);
 
-		wim=im-blurM; // or absdiff?
+		wim=im-backgr; // or absdiff?
 
 		/* threshold(alpha_blur, alpha_blur, 127.5, 1e38, THRESH_TOZERO);
 		imwrite("alpha_blur.tif", alpha_blur); */
@@ -323,8 +323,8 @@ int main(int argc, char **argv) {
 		multiply(wim, /* alpha_blur or */ alpha, wim, 1./255);
 	}
 	else { // channels <= 3
-		blur(im, blurM, ksize);
-		wim=im-blurM; // or absdiff?
+		blur(im, backgr, ksize);
+		wim=im-backgr; // or absdiff?
 	}
 
 	if(debug) imwrite("work.tif", wim);	
