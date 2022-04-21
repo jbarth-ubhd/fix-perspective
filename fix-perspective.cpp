@@ -39,10 +39,11 @@
 	TODO: exif orientation ← IMREAD_UNCHANGED
 */
 
-#define MIN_TEXT_LINES 30.f
-const float min_better=1.2f;
-const float angle_range=7.0;
-const float angle_step =0.1;
+#define MIN_TEXT_LINES  30.f
+const float min_better = 1.2f;
+const float angle_range= 7.0f;
+const float angle_step = 0.1f;
+int   alpha_erode      =15;
 
 using namespace std;
 using namespace cv;
@@ -279,8 +280,18 @@ int main(int argc, char **argv) {
 		// TODO channels==2
 		assert(un.channels()!=2);
 
-		// "blur" blurs all channels separately,
-		// without skiping transparent pixels
+		/*  alpha channel handling for bluring (subtract text background)
+			blur() blurs each channel individually without skipping transparent
+			pixels.
+			Example: grayscale + alpha, blur(in, out, 3×3 px), maxval = 3
+			grayscale:  alpha:
+				3 3 0   3 0 0
+				3 3 0   3 0 0 → should be mean = 3 of the center pixel,
+				3 3 0   3 0 0   but blur() says 2.
+
+			So I'm doing blur(grayscale ⊙ alpha) / blur(alpha)
+		*/
+
 		assert(im.cols==un.cols/2 && im.rows==un.rows/2); // exif orientation
 
 		resize(un, un, im.size());
@@ -295,10 +306,10 @@ int main(int argc, char **argv) {
 		Mat alpha=rgba[3];
 		Mat alpha_blur;
 
-		int erosion_size=15; // TODO adjustable
+		// optionally erode alpha channel to skip page edges & book fold
 		Mat element = getStructuringElement( MORPH_ELLIPSE,
-                       Size( 2*erosion_size + 1, 2*erosion_size+1 ),
-                       Point( erosion_size, erosion_size ) );
+                       Size( 2*alpha_erode + 1, 2*alpha_erode+1 ),
+                       Point( alpha_erode, alpha_erode ) );
 		erode(alpha, alpha, element);
 
 		blur(alpha, alpha_blur, ksize);
