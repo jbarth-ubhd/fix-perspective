@@ -277,9 +277,6 @@ int main(int argc, char **argv) {
 	Mat backgr;
 	Mat wim;
 	if(un.channels()==2 || un.channels()>3) { // alpha channel present
-		// TODO channels==2
-		assert(un.channels()!=2);
-
 		/*  alpha channel handling for bluring (subtract text background)
 			blur() blurs each channel individually without skipping transparent
 			pixels.
@@ -297,15 +294,22 @@ int main(int argc, char **argv) {
 
 		resize(un, un, im.size());
 
-		Mat rgba[un.channels()];
-		split(un, rgba);
-		vector<Mat> channels = {rgba[0],rgba[1],rgba[2]};
-		Mat rgb;
-		merge(channels, rgb);
-		cvtColor(rgb, backgr, COLOR_RGB2GRAY);
-
-		Mat alpha=rgba[3];
-		Mat alpha_blur;
+		Mat alpha;
+		if(un.channels()>3) {
+			Mat rgba[un.channels()];
+			split(un, rgba);
+			vector<Mat> channels = {rgba[0],rgba[1],rgba[2]};
+			Mat rgb;
+			merge(channels, rgb);
+			cvtColor(rgb, backgr, COLOR_RGB2GRAY);
+			alpha=rgba[3];
+		}
+		if(un.channels()==2) { // TODO: not tested
+			Mat ga[un.channels()];
+			split(un, ga);
+			backgr=ga[0];
+			alpha =ga[1];
+		}
 
 		// optionally erode alpha channel to skip page edges & book fold
 		Mat element = getStructuringElement( MORPH_ELLIPSE,
@@ -313,6 +317,7 @@ int main(int argc, char **argv) {
                        Point( alpha_erode, alpha_erode ) );
 		erode(alpha, alpha, element);
 
+		Mat alpha_blur;
 		blur(alpha, alpha_blur, ksize);
 
 		backgr=255-backgr; // TODO maxval?
