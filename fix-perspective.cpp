@@ -289,7 +289,8 @@ int main(int argc, char **argv) {
 				3 3 0   3 0 0 → should be mean = 3 of the center pixel,
 				3 3 0   3 0 0   but blur() says 2.
 
-			So I'm doing blur(grayscale ⊙ alpha) / blur(alpha)
+			So I'm doing blur(grayscale ⊙ alpha) ⊘ blur(alpha)
+			div/0 is not a problem: "For integer types when src2(I) is zero, dst(I) will also be zero." 
 		*/
 
 		assert(im.cols==un.cols/2 && im.rows==un.rows/2); // exif orientation
@@ -316,12 +317,12 @@ int main(int argc, char **argv) {
 
 		backgr=255-backgr; // TODO maxval?
 		Mat out;
-		multiply(backgr, alpha, out, 1, CV_16U); // inplace does not work?
+		multiply(backgr, alpha, out, 1, CV_16U); // inplace does not work?!
 		backgr=out;
 
 		blur(backgr, backgr, ksize);
 
-		divide(backgr, alpha_blur, out, 1, CV_8U); // inplace?
+		divide(backgr, alpha_blur, out, 1, CV_8U); // inplace does not work?!
 		backgr=out;
 
 		if(debug) imwrite("backgr.tif", backgr);
