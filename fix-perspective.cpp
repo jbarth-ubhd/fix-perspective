@@ -257,7 +257,7 @@ int main(int argc, char **argv) {
 		printf("e. g.  %s input.tif output.tif\n", argv[0]);
 		return 1;
 	}
-    Mat im   =imread(argv[1], IMREAD_REDUCED_GRAYSCALE_2);
+    Mat im   =imread(argv[1], IMREAD_REDUCED_GRAYSCALE_2); // TODO: When using IMREAD_GRAYSCALE, the codec's internal grayscale conversion will be used, if available. Results may differ to the output of cvtColor()
 
     if(im.data==NULL) return 255;
     im=255-im; // TODO maxval
@@ -301,7 +301,7 @@ int main(int argc, char **argv) {
 			vector<Mat> channels = {rgba[0],rgba[1],rgba[2]};
 			Mat rgb;
 			merge(channels, rgb);
-			cvtColor(rgb, backgr, COLOR_RGB2GRAY);
+			cvtColor(rgb, backgr, COLOR_RGB2GRAY); // TODO see note at IMREAD_REDUCED_GRAYSCALE_2
 			alpha=rgba[3];
 		}
 		if(un.channels()==2) { // TODO: not tested
